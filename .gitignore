@@ -1,0 +1,12 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+.env
+
+# Uploads (user files, don't push these)
+uploads/
+
+# Node (for later)
+node_modules/
+.next/
