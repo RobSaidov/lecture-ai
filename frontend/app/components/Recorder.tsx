@@ -21,6 +21,8 @@ export default function Recorder() {
       // ask browser for microphone access
       const stream = await navigator.mediaDevices.getUserMedia({audio: true});
 
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
       //create a recorder from the microphone stream
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
