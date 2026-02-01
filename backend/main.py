@@ -1,9 +1,20 @@
 from fastapi import FastAPI, UploadFile, File # import necessary modules, like FastAPI for creating the server and UploadFile, File for handling file uploads
+from fastapi.middleware.cors import CORSMiddleware # import CORS middleware to handle cross-origin requests
 import os # this helps to create folders and manage file paths
 import uuid # this is used to generate unique names for uploaded files
 import whisper  # placeholder for the transcription library
+import uvicorn  # ASGI server for running FastAPI applications
 
 app = FastAPI() # created a server instance
+
+# allowing frontend to access backend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # Your frontend URL
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow all methods (GET, POST, etc.)
+    allow_headers=["*"],  # Allow all headers
+)
 
 os.makedirs("uploads", exist_ok = True) # creates and uploads folder if it doesn't exist
 
