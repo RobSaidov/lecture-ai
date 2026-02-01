@@ -8,6 +8,8 @@ export default function Recorder() {
   const [error, setError] = useState<string | null>(null);
   const [transcript, setTranscript] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [notes, setNotes] = useState<string | null>(null);
+  const [isGeneratingNotes, setIsGeneratingNotes] = useState(false);
 
 
 
@@ -45,6 +47,36 @@ export default function Recorder() {
       setIsLoading(false); // Hide "Transcribing..."
     }
   };
+
+  const generateNotes = async () => {
+    if (!transcript) return;
+    
+    setIsGeneratingNotes(true);
+    setNotes(null);
+    
+    try {
+      const response = await fetch("http://localhost:8000/generate-notes", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",  // telling bakcend we are sending JSON
+        },
+        body: JSON.stringify({ transcript }),  //send the transcript as JSON
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to generate notes");
+      }
+      
+      const data = await response.json();
+      setNotes(data.notes);
+    } catch (err) {
+      setError("Failed to generate notes. Is Ollama running?");
+      console.log("Notes error:", err);
+    } finally {
+      setIsGeneratingNotes(false);
+    }
+  };
+
 
 
 
@@ -99,6 +131,11 @@ export default function Recorder() {
       setIsRecording(true);
       setError(null); // clear previous errors
       setTranscript(null); // clear previous transcript
+      setNotes(null); // clear previous notes
+
+
+
+
     } catch (err) {
       setError("Could not access microphone. Please check permissions.");
       console.log("Microphone error:", err);  
@@ -151,6 +188,28 @@ export default function Recorder() {
         <div className="mt-4 p-4 bg-gray-100 rounded-lg max-w-md">
           <p className="text-sm font-semibold mb-2">Transcript:</p>
           <p className="text-gray-700">{transcript}</p>
+        </div>
+      )}
+      {/* Generate Notes button - only show after transcript is ready */}
+      {transcript && !isGeneratingNotes && (
+        <button
+          onClick={generateNotes}
+          className="bg-blue-500 text-white px-6 py-3 rounded-full text-lg font-semibold mt-4"
+        >
+          Generate Notes
+        </button>
+      )}
+
+      {/* NEW: Show loading while generating notes */}
+      {isGeneratingNotes && (
+        <p className="text-blue-500">Generating notes...</p>
+      )}
+
+      {/* NEW: Show notes when ready */}
+      {notes && (
+        <div className="mt-4 p-4 bg-green-100 rounded-lg max-w-md">
+          <p className="text-sm font-semibold mb-2">Notes:</p>
+          <pre className="text-gray-700 whitespace-pre-wrap text-sm">{notes}</pre>
         </div>
       )}
     </div>

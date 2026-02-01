@@ -41,7 +41,7 @@ def generate_notes(transcript: str):
 
 Transcript: {transcript}
 
-Keep it short and organized.""",
+Keep it short and organized. Do NOT use markdown formatting like ** or #. Just use plain text with dashes for lists.""",
         "stream": False
       }
     )
