@@ -4,21 +4,61 @@ import os # this helps to create folders and manage file paths
 import uuid # this is used to generate unique names for uploaded files
 import whisper  # placeholder for the transcription library
 import uvicorn  # ASGI server for running FastAPI applications
+import requests # let's python talk to external APIs or in our case Ollama
+
 
 app = FastAPI() # created a server instance
 
 # allowing frontend to access backend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Your frontend URL
+    allow_origins=["http://localhost:3000"],  # the frontend URL
     allow_credentials=True,
-    allow_methods=["*"],  # Allow all methods (GET, POST, etc.)
-    allow_headers=["*"],  # Allow all headers
+    allow_methods=["*"],  # allowing all the HTTP methods
+    allow_headers=["*"],  # also allowing all headers
 )
 
 os.makedirs("uploads", exist_ok = True) # creates and uploads folder if it doesn't exist
 
 model = whisper.load_model("small")  # placeholder for loading the transcription model
+
+def generate_notes(transcript: str):
+  """
+  Sends transcript to Ollama AI and get back organized notes
+  
+  """
+  try: 
+    #send request to ollama(it runs on port 11434)
+    response = requests.post(
+      "http://localhost:11434/api/generate",
+      json={
+        "model": "llama3.2",
+        "prompt": f"""Analyze this lecture transcript and extract:
+
+1. TOPICS: Key concepts covered
+2. IMPORTANT DATES: Any deadlines, exam dates, due dates
+3. TODOS: Things students need to do
+
+Transcript: {transcript}
+
+Keep it short and organized.""",
+        "stream": False
+      }
+    )
+    # if it worked, return the notes
+    if response.status_code == 200:
+      return response.json()['response']
+    else:
+      return "Error: Could not generate notes."
+    
+  except Exception as e:
+    return f"error connecting to ollama: {str(e)}"
+  
+    
+    
+    
+    
+    
 
 @app.get("/") # GET endpoint for the home route
 def home():
@@ -61,6 +101,31 @@ async def transcribe_file(file: UploadFile = File(...)):
     "filename": file.filename,
     "transcript": result["text"]
   }
+  
+@app.post("/generate-notes") # POST endpoint for generating notes
+async def generate_lecture_notes(data: dict):
+  """receives a transcript and returns ai generate notes
+  
+  frontend sends - {"transcript": "today we learned about..."}
+  backend returns - {notes: "TOPICS: ...\nDates:... \nTODOS: ..."}
+  
+  """
+  
+  #get the transcpt from the request
+  transcript = data.get("transcript", "")
+  
+  #check if transcript exists
+  if not transcript:
+    return {"error": "not transcript provided."}
+  
+  #send to ollama and get notes
+  notes = generate_notes(transcript)
+  
+  #return the notes
+  return {"notes": notes}
+
+
+  
   
   
 if __name__ == "__main__":
