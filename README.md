@@ -34,4 +34,4 @@ POST /generate-notes   - Text → structured notes
 
 ---
 
-MIT License | [Your Name] | [@username]
+MIT License | [Rob Saidov] | [@robsaidov]
