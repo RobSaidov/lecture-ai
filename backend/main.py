@@ -35,13 +35,13 @@ def generate_notes(transcript: str):
         "model": "llama3.2",
         "prompt": f"""Analyze this lecture transcript and extract:
 
-1. TOPICS: Key concepts covered
-2. IMPORTANT DATES: Any deadlines, exam dates, due dates
-3. TODOS: Things students need to do
+          1. TOPICS: Key concepts covered
+          2. IMPORTANT DATES: Any deadlines, exam dates, due dates
+          3. TODOS: Things students need to do
 
-Transcript: {transcript}
+        Transcript: {transcript}
 
-Keep it short and organized. Do NOT use markdown formatting like ** or #. Just use plain text with dashes for lists.""",
+        Keep it short and organized. Do NOT use markdown formatting like ** or #. Just use plain text with dashes for lists.""",
         "stream": False
       }
     )
