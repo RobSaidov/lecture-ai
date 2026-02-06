@@ -1,8 +1,9 @@
 "use client";
 
-import {useState, useRef} from "react";
+import { useState, useRef } from "react";
 
 export default function Recorder() {
+  // state variables - these update the UI when changed
   const [isRecording, setIsRecording] = useState(false);
   const [audioURL, setAudioURL] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -11,47 +12,41 @@ export default function Recorder() {
   const [notes, setNotes] = useState<string | null>(null);
   const [isGeneratingNotes, setIsGeneratingNotes] = useState(false);
 
-
-
+  // refs - these dont trigger re-renders, just store values
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
-  const streamRef = useRef<MediaStream | null>(null); // to stop the stream later if needed
-  const fileInputRef= useRef<HTMLInputElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null); // for the hidden file input
 
-
+  // sends recorded audio to the backend for transcription
   const sendToBackend = async (audioBlob: Blob) => {
-    setIsLoading(true);  // Show "Transcribing..."
-    setTranscript(null); // Clear old transcript
+    setIsLoading(true);
+    setTranscript(null);
 
     try {
-      // Put the audio file in a "FormData envelope"
       const formData = new FormData();
       formData.append("file", audioBlob, "recording.webm");
 
-      // Send to your backend
       const response = await fetch("http://localhost:8000/transcribe", {
         method: "POST",
         body: formData,
       });
 
-      // Check if it worked
       if (!response.ok) {
         throw new Error("Failed to transcribe");
       }
 
-      // Get the transcript from response
       const data = await response.json();
       setTranscript(data.transcript);
     } catch (err) {
       setError("Failed to send to backend. Is it running?");
       console.log("Backend error:", err);
     } finally {
-      setIsLoading(false); // Hide "Transcribing..."
+      setIsLoading(false);
     }
   };
 
-  // function to handle file upload
-
+  // handles when user uploads a file instead of recording
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -59,14 +54,15 @@ export default function Recorder() {
     setIsLoading(true);
     setTranscript(null);
     setNotes(null);
+
+    // create a url so we can play the uploaded file
     const fileURL = URL.createObjectURL(file);
     setAudioURL(fileURL);
 
-    
     try {
       const formData = new FormData();
       formData.append("file", file);
-      
+
       const response = await fetch("http://localhost:8000/upload", {
         method: "POST",
         body: formData,
@@ -87,25 +83,26 @@ export default function Recorder() {
     }
   };
 
+  // sends transcript to ollama to get organized notes back
   const generateNotes = async () => {
     if (!transcript) return;
-    
+
     setIsGeneratingNotes(true);
     setNotes(null);
-    
+
     try {
       const response = await fetch("http://localhost:8000/generate-notes", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",  // telling bakcend we are sending JSON
+          "Content-Type": "application/json", // telling backend we're sending json
         },
-        body: JSON.stringify({ transcript }),  //send the transcript as JSON
+        body: JSON.stringify({ transcript }),
       });
-      
+
       if (!response.ok) {
         throw new Error("Failed to generate notes");
       }
-      
+
       const data = await response.json();
       setNotes(data.notes);
     } catch (err) {
@@ -116,71 +113,54 @@ export default function Recorder() {
     }
   };
 
-
-
-
-
   const startRecording = async () => {
-    // Check if browser suports microphone access
+    // check if browser supports microphone
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       setError("Microphone access is not supported in this browser.");
       return;
     }
 
-    try {  
-      // ask browser for microphone access
-      const stream = await navigator.mediaDevices.getUserMedia({audio: true});
+    try {
+      // ask for microphone permission
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
 
-      // small delay to ensure stream is ready
-
+      // wait for mic to warm up so we dont get noise at the start
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      //create a recorder from the microphone stream
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
 
-      //when audio data comes in we save it to chynks
+      // collect audio chunks as they come in
       mediaRecorder.ondataavailable = (event) => {
         chunksRef.current.push(event.data);
       };
 
-      // when recording stops, combine all chunks into a single audio file
+      // when recording stops, combine chunks and send to backend
       mediaRecorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, {type: "audio/wav"});
+        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
         const url = URL.createObjectURL(blob);
         setAudioURL(url);
-        
 
-        // Send the audio blob to the backend for transcription
         sendToBackend(blob);
 
-        chunksRef.current = []; // clear for next recording
-        
-        // Turn off microphone
+        chunksRef.current = [];
+
+        // stop all mic tracks so the browser mic indicator goes away
         if (streamRef.current) {
-          streamRef.current.getTracks().forEach(track => track.stop());
+          streamRef.current.getTracks().forEach((track) => track.stop());
         }
+      };
 
-      };  
-
-
-      //start recording
       mediaRecorder.start();
       setIsRecording(true);
-      setError(null); // clear previous errors
-      setTranscript(null); // clear previous transcript
-      setNotes(null); // clear previous notes
-
-
-
-
+      setError(null);
+      setTranscript(null);
+      setNotes(null);
     } catch (err) {
       setError("Could not access microphone. Please check permissions.");
-      console.log("Microphone error:", err);  
+      console.log("Microphone error:", err);
     }
-  
-    
   };
 
   const stopRecording = () => {
@@ -188,32 +168,29 @@ export default function Recorder() {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
     }
-
   };
 
   return (
-    <div className="flex flex-col items-center gap-4 mt-8">
-      {/* Recording Button */}
-      <button
-        onClick={isRecording ? stopRecording : startRecording}
-        className="bg-red-500 text-white px-6 py-3 rounded-full text-lg font-semibold"
-      >
-        {isRecording ? "Stop Recording" : "Start Recording"}
-      </button>
+    <div className="space-y-6">
 
-      <p className="text-gray-500">
-        {isRecording ? "Recording..." : "Click to start"}
-      </p>
+      {/* record and upload buttons */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={isRecording ? stopRecording : startRecording}
+          className="px-5 py-2.5 rounded-lg text-sm font-medium bg-black text-white hover:bg-gray-800 transition-colors"
+        >
+          {isRecording ? "Stop Recording" : "Record"}
+        </button>
 
-      {/* File Upload Section - SEPARATE from the <p> above */}
-      <div className="mt-4 text-center">
-        <span className="text-gray-500 mb-2 block">OR</span>
+        <span className="text-gray-400 text-sm">or</span>
+
         <button
           onClick={() => fileInputRef.current?.click()}
-          className="bg-blue-500 text-white px-6 py-3 rounded-full text-lg font-semibold"
+          className="px-5 py-2.5 rounded-lg text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
         >
-          Upload Audio File
+          Upload File
         </button>
+        {/* hidden file input - gets triggered when upload button is clicked */}
         <input
           ref={fileInputRef}
           type="file"
@@ -221,53 +198,78 @@ export default function Recorder() {
           onChange={handleFileUpload}
           className="hidden"
         />
+
+        {/* recording indicator - small red dot */}
+        {isRecording && (
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+            <span className="text-sm text-gray-500">Recording</span>
+          </div>
+        )}
       </div>
 
-      {/* Show error if something goes wrong*/}
+      {/* error messages */}
       {error && (
-        <p className="text-red-500 text-sm">{error}</p>
+        <div className="px-4 py-3 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-sm text-red-600">{error}</p>
+        </div>
       )}
 
-
-      {/*show audio player if recording*/}
+      {/* audio player - shows for both recorded and uploaded files */}
       {audioURL && (
-        <div className="mt-4">
-          <p className="text-sm text-gray-500 mb-2">Your Recording:</p>
-          <audio src={audioURL} controls />
+        <div className="border border-gray-200 rounded-lg p-4">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">
+            Audio
+          </p>
+          <audio src={audioURL} controls className="w-full" />
         </div>
       )}
 
-      {/* Show loading indicator */}
+      {/* loading spinner while transcribing */}
       {isLoading && (
-        <p className="text-gray-500 mt-2">Transcribing...</p>
-      )}
-      {/* Show transcript if available */}
-      {transcript && (
-        <div className="mt-4 p-4 bg-gray-100 rounded-lg max-w-md">
-          <p className="text-sm font-semibold mb-2">Transcript:</p>
-          <p className="text-gray-700">{transcript}</p>
+        <div className="flex items-center gap-2 py-4">
+          <div className="w-4 h-4 border-2 border-gray-300 border-t-black rounded-full animate-spin" />
+          <span className="text-sm text-gray-500">Transcribing audio...</span>
         </div>
       )}
-      {/* Generate Notes button - only show after transcript is ready */}
+
+      {/* transcript section */}
+      {transcript && (
+        <div className="border border-gray-200 rounded-lg p-5">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">
+            Transcript
+          </p>
+          <p className="text-sm text-gray-800 leading-relaxed">{transcript}</p>
+        </div>
+      )}
+
+      {/* generate notes button - only shows after we have a transcript */}
       {transcript && !isGeneratingNotes && (
         <button
           onClick={generateNotes}
-          className="bg-blue-500 text-white px-6 py-3 rounded-full text-lg font-semibold mt-4"
+          className="px-5 py-2.5 rounded-lg text-sm font-medium bg-black text-white hover:bg-gray-800 transition-colors"
         >
           Generate Notes
         </button>
       )}
 
-      {/* Show loading while generating notes */}
+      {/* loading spinner while generating notes */}
       {isGeneratingNotes && (
-        <p className="text-blue-500">Generating notes...</p>
+        <div className="flex items-center gap-2 py-4">
+          <div className="w-4 h-4 border-2 border-gray-300 border-t-black rounded-full animate-spin" />
+          <span className="text-sm text-gray-500">Generating notes...</span>
+        </div>
       )}
 
-      {/*Show notes when ready */}
+      {/* notes section */}
       {notes && (
-        <div className="mt-4 p-4 bg-green-100 rounded-lg max-w-md">
-          <p className="text-sm font-semibold mb-2">Notes:</p>
-          <pre className="text-gray-700 whitespace-pre-wrap text-sm">{notes}</pre>
+        <div className="border border-gray-200 rounded-lg p-5">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">
+            Notes
+          </p>
+          <pre className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap font-sans">
+            {notes}
+          </pre>
         </div>
       )}
     </div>
