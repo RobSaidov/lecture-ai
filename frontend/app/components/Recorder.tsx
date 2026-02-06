@@ -16,6 +16,8 @@ export default function Recorder() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null); // to stop the stream later if needed
+  const fileInputRef= useRef<HTMLInputElement | null>(null);
+
 
   const sendToBackend = async (audioBlob: Blob) => {
     setIsLoading(true);  // Show "Transcribing..."
@@ -45,6 +47,43 @@ export default function Recorder() {
       console.log("Backend error:", err);
     } finally {
       setIsLoading(false); // Hide "Transcribing..."
+    }
+  };
+
+  // function to handle file upload
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsLoading(true);
+    setTranscript(null);
+    setNotes(null);
+    const fileURL = URL.createObjectURL(file);
+    setAudioURL(fileURL);
+
+    
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      
+      const response = await fetch("http://localhost:8000/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to upload file");
+      }
+
+      const data = await response.json();
+      setTranscript(data.transcript);
+      setError(null);
+    } catch (err) {
+      setError("Failed to upload file. Is it an audio file?");
+      console.log("Upload error:", err);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -95,7 +134,7 @@ export default function Recorder() {
 
       // small delay to ensure stream is ready
 
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
 
       //create a recorder from the microphone stream
       const mediaRecorder = new MediaRecorder(stream);
@@ -154,8 +193,9 @@ export default function Recorder() {
 
   return (
     <div className="flex flex-col items-center gap-4 mt-8">
+      {/* Recording Button */}
       <button
-        onClick = {isRecording ? stopRecording : startRecording}
+        onClick={isRecording ? stopRecording : startRecording}
         className="bg-red-500 text-white px-6 py-3 rounded-full text-lg font-semibold"
       >
         {isRecording ? "Stop Recording" : "Start Recording"}
@@ -163,8 +203,26 @@ export default function Recorder() {
 
       <p className="text-gray-500">
         {isRecording ? "Recording..." : "Click to start"}
-
       </p>
+
+      {/* File Upload Section - SEPARATE from the <p> above */}
+      <div className="mt-4 text-center">
+        <span className="text-gray-500 mb-2 block">OR</span>
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className="bg-blue-500 text-white px-6 py-3 rounded-full text-lg font-semibold"
+        >
+          Upload Audio File
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="audio/*"
+          onChange={handleFileUpload}
+          className="hidden"
+        />
+      </div>
+
       {/* Show error if something goes wrong*/}
       {error && (
         <p className="text-red-500 text-sm">{error}</p>
@@ -200,12 +258,12 @@ export default function Recorder() {
         </button>
       )}
 
-      {/* NEW: Show loading while generating notes */}
+      {/* Show loading while generating notes */}
       {isGeneratingNotes && (
         <p className="text-blue-500">Generating notes...</p>
       )}
 
-      {/* NEW: Show notes when ready */}
+      {/*Show notes when ready */}
       {notes && (
         <div className="mt-4 p-4 bg-green-100 rounded-lg max-w-md">
           <p className="text-sm font-semibold mb-2">Notes:</p>

@@ -54,11 +54,7 @@ Keep it short and organized. Do NOT use markdown formatting like ** or #. Just u
   except Exception as e:
     return f"error connecting to ollama: {str(e)}"
   
-    
-    
-    
-    
-    
+  
 
 @app.get("/") # GET endpoint for the home route
 def home():
@@ -91,7 +87,7 @@ async def upload_file(file: UploadFile = File(...)): # endpoint to handle file u
   result= model.transcribe(file_path)
   
   #return the transcript
-  return {"file_id": file_id, "filename": file.filename, "status": "uploaded"}
+  return {"file_id": file_id, "filename": file.filename, "transcript": result["text"]}
   
   
 @app.post("/transcribe") # POST endpoint for transcription
