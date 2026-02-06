@@ -72,6 +72,13 @@ def health():
 
 @app.post("/upload") # POST endpoint for file upload
 async def upload_file(file: UploadFile = File(...)): # endpoint to handle file uploads
+  """
+  receives an uploaded audio file, transcribe it, and returns the transcript
+  
+  this endpoint is for uploading existing audio files(not to record through the browser, that will be a future feature) and saving them to the server. The frontend will send a POST request with the audio file, and the backend will save it in the uploads folder with a unique name. The response will include the file ID and original filename for reference.
+  
+  """
+  
   file_id = str(uuid.uuid4()) # generate a unique id for the file
   file_path = f"uploads/{file_id}_{file.filename}"
   
@@ -80,6 +87,10 @@ async def upload_file(file: UploadFile = File(...)): # endpoint to handle file u
     content = await file.read()
     f.write(content)
     
+  #transcribe with Whisper
+  result= model.transcribe(file_path)
+  
+  #return the transcript
   return {"file_id": file_id, "filename": file.filename, "status": "uploaded"}
   
   
